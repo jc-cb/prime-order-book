@@ -1,18 +1,30 @@
+# Copyright 2023-present Coinbase Global, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import asyncio
-import json, hmac, hashlib, base64
-import time
+import json, hmac, hashlib, base64, os, time, sys, math
 import websockets
-import sys
 import pandas as pd
-from decimal import Decimal
-import math
 import sqlite3
+from decimal import Decimal
+from dotenv import load_dotenv
 
-ACCESS_KEY = 'ACCESS_KEY'
-SECRET_KEY = 'SECRET_KEY'
-PASSPHRASE = 'SVC_ACCOUNTID'
-SVC_ACCOUNTID = 'SVC_ACCOUNTID'
-PORTFOLIO_ID = 'PORTFOLIO_ID'
+load_dotenv()
+
+ACCESS_KEY = os.environ.get("API_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+PASSPHRASE = os.environ.get("PASSPHRASE")
+SVC_ACCOUNTID = os.environ.get("SVC_ACCOUNTID")
 
 URI = 'wss://ws-feed.prime.coinbase.com'
 TIMESTAMP = str(int(time.time()))
@@ -20,7 +32,7 @@ conn = sqlite3.connect('./prime_orderbook.db')
 
 channel = 'l2_data'
 product_id = 'ETH-USD'
-agg_level = '1'
+agg_level = '0.1'
 
 
 async def main_loop():
@@ -76,6 +88,7 @@ class OrderBookProcessor():
                 self.offers.append(level)
             else:
                 raise IOError()
+        self._sort()
 
     def apply_update(self, data):
         event = json.loads(data)
@@ -87,6 +100,7 @@ class OrderBookProcessor():
             for update in updates:
                 self._apply(update)
         self._filter_closed()
+        self._sort()
 
     def _apply(self, level):
         if level["side"] == "bid":
@@ -112,6 +126,10 @@ class OrderBookProcessor():
         self.bids = [x for x in self.bids if abs(float(x["qty"])) > 0]
         self.offers = [x for x in self.offers if abs(float(x["qty"])) > 0]
 
+    def _sort(self):
+        self.bids = sorted(self.bids, key=lambda x: float(x["px"]) * -1)
+        self.offers = sorted(self.offers, key=lambda x: float(x["px"]))
+
     def create_df(self, agg_level):
 
         bids = self.bids[:300]
@@ -120,10 +138,13 @@ class OrderBookProcessor():
         bid_df = pd.DataFrame(bids, columns=['px', 'qty'], dtype=float)
         ask_df = pd.DataFrame(asks, columns=['px', 'qty'], dtype=float)
 
+
+
         bid_df = self.aggregate_levels(
             bid_df, agg_level=Decimal(agg_level), side='bid')
         ask_df = self.aggregate_levels(
             ask_df, agg_level=Decimal(agg_level), side='offer')
+
 
         bid_df = bid_df.sort_values('px', ascending=False)
         ask_df = ask_df.sort_values('px', ascending=False)
@@ -137,7 +158,6 @@ class OrderBookProcessor():
         ask_df = ask_df.iloc[::-1]
 
         order_book = pd.concat([ask_df, bid_df])
-
         return order_book
 
     def aggregate_levels(self, levels_df, agg_level, side='bid'):
