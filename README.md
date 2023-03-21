@@ -23,7 +23,7 @@ Add your credentials to ``example.env``, then run this command to rename that fi
 cp example.env .env
 ```
 
-You can now run the program with the below commanda, which will open the application in your default browser window: 
+You can now run the program with the below command, which will open the application in your default browser window: 
 
 ```
 python orderbook.py
