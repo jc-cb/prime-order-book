@@ -138,13 +138,10 @@ class OrderBookProcessor():
         bid_df = pd.DataFrame(bids, columns=['px', 'qty'], dtype=float)
         ask_df = pd.DataFrame(asks, columns=['px', 'qty'], dtype=float)
 
-
-
         bid_df = self.aggregate_levels(
             bid_df, agg_level=Decimal(agg_level), side='bid')
         ask_df = self.aggregate_levels(
             ask_df, agg_level=Decimal(agg_level), side='offer')
-
 
         bid_df = bid_df.sort_values('px', ascending=False)
         ask_df = ask_df.sort_values('px', ascending=False)
@@ -160,8 +157,7 @@ class OrderBookProcessor():
         order_book = pd.concat([ask_df, bid_df])
         return order_book
 
-    def aggregate_levels(self, levels_df, agg_level, side='bid'):
-
+    def aggregate_levels(self, levels_df, agg_level, side):
         if side == 'bid':
             right = False
             def label_func(x): return x.left
@@ -180,7 +176,6 @@ class OrderBookProcessor():
         levels_df = levels_df.groupby('bin').agg(qty=('qty', 'sum')).reset_index()
 
         levels_df['px'] = levels_df.bin.apply(label_func)
-
         levels_df = levels_df[levels_df.qty > 0]
         levels_df = levels_df[['px', 'qty']]
 

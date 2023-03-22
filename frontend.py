@@ -20,7 +20,7 @@ app = Dash(__name__)
 
 app.layout = html.Div([
     html.H1(id='mid-price'),
-    dcc.Interval(id='update', interval=2000),
+    dcc.Interval(id='update', interval=1000),
     dash_table.DataTable(id='my-table',
                          columns=[
                              {'name': 'Price', 'id': 'px', 'type': 'text'},
